@@ -1,0 +1,210 @@
+/**
+ * WHAT THIS SCRIPT DOES
+ * This script goes through your Gmail inbox and deletes old unlabelled
+ * emails with a certain subject or from a certain sender.
+ * It only deletes the unlabelled ones so that adding a label is an
+ * easy way for you to mark an email as non-deletable, but you can
+ * override this.
+ * There are functions to delete emails with subjects or from senders
+ * older than a week and a month and you can easily add more.
+ * You can run everything manually or set up triggers to do it
+ * regularly and automatically.
+ * You have to write the subjects and senders you want to delete.
+ * The search matches subjects that start with the given subjects
+ * (useful for e.g. newsletters where the date varies) and senders that
+ * are equal to the given senders.
+ * You'll receive emails telling you what's been deleted.
+ * 
+ * HOW TO USE THIS SCRIPT
+ * - Copy the script
+ * - Sign in to your Google account and go to https://script.google.com
+ * - Paste the script
+ * - Save it (save icon) and enter a project name e.g. "DeleteOldEmails"
+ * - Optionally, rename the script so that it's not called "Code.gs"
+ *   (click on the arrow next to the script name on the left)
+ * - Add the subjects that you want to delete when they're older than
+ *   a week to WEEK_SUBJECT
+ * - Add the senders that you want to delete when they're older than
+ *   a week to WEEK_FROM
+ * - Add the subjects that you want to delete when they're older than
+ *   a month to MONTH_SUBJECT
+ * - Add the senders that you want to delete when they're older than
+ *   a month to MONTH_FROM
+ * - Save your changes
+ * Now it's ready to run :)
+ * - To run the functions manually, select the function you want to
+ *   run in the dropdown menu at the top and hit the "Run" button.
+ * - To set up triggers and run the functions automatically, go to
+ *   "Edit" > "Current project's triggers" > "No triggers set up.
+ *   Click here to add one now." and select which function you want to
+ *   run when. You can add more functions clicking on "Add new trigger".
+ * Note that you'll have to accept some permissions the first time
+ * it runs.
+ */
+
+MY_EMAIL = Session.getActiveUser().getEmail();
+SUBJECT = "subject"
+FROM = "from"
+
+// dates
+A_MONTH_AGO = new Date();
+A_MONTH_AGO.setMonth(A_MONTH_AGO.getMonth() - 1);
+A_WEEK_AGO = new Date();
+A_WEEK_AGO.setDate(A_WEEK_AGO.getDate() - 7);
+
+// GmailApp.getInboxThreads() is unreliable (as the documentation says)
+// and doesn't seem to recover more than 500 threads. Therefore we use
+// GmailApp.getInboxThreads(start, max) with a max of MAX_THREADS.
+MAX_THREADS = 500
+
+// arrays of subjects to search for
+SUBJECT_1 = "Newsletter 1"
+SUBJECT_2 = "Newsletter 2"
+WEEK_SUBJECT = [SUBJECT_1, SUBJECT_2]
+SUBJECT_3 = "Newsletter 3"
+SUBJECT_4 = "Newsletter 4"
+MONTH_SUBJECT = [SUBJECT_3, SUBJECT_4]
+
+// arrays of senders to search for
+FROM_1 = "Blah <blah1@blah.com>"
+FROM_2 = "Blah <blah2@blah.com>"
+WEEK_FROM = [FROM_1, FROM_2]
+FROM_3 = "Blah <blah3@blah.com>"
+FROM_4 = "Blah <blah4@blah.com>"
+MONTH_FROM = [FROM_3, FROM_4]
+
+/**
+ * Delete all threads without a label older than a week if the subject
+ * starts with something in WEEK_SUBJECT.
+ */
+function trashOldWeeklySubject() {
+  trashAllOldThreads_(WEEK_SUBJECT, A_WEEK_AGO, SUBJECT);
+}
+
+/**
+ * Delete all threads without a label older than a month if the subject
+ * starts with something in MONTH_SUBJECT.
+ */
+function trashOldMonthlySubject() {
+  trashAllOldThreads_(MONTH_SUBJECT, A_MONTH_AGO, SUBJECT);
+}
+
+/**
+ * Delete all threads without a label older than a week if the sender
+ * is in WEEK_FROM.
+ */
+function trashOldWeeklyFrom() {
+  trashAllOldThreads_(WEEK_FROM, A_WEEK_AGO, FROM);
+}
+
+/**
+ * Delete all threads without a label older than a month if the sender
+ * is in MONTH_FROM.
+ */
+function trashOldMonthlyFrom() {
+  trashAllOldThreads_(MONTH_FROM, A_MONTH_AGO, FROM);
+}
+
+/**
+ * Delete all threads without a label older than the given date where
+ * the given field matches the given values.
+ * The script can be too slow to finish before timing out, so by calling
+ * trashOldThreadsInGivenThreads_ multiple times we maximise the chances
+ * of deleting some threads.
+ * @param {string[]} values - values to look for in threads
+ * @param {date} dateTh - date threshold, only threads older than this
+ *                        may be deleted
+ * @param {string} field - where to look for the values, SUBJECT or FROM
+ */
+function trashAllOldThreads_(values, dateTh, field) {
+  var start = 0;
+  var threads = GmailApp.getInboxThreads(start, MAX_THREADS);
+  while (threads.length > 0) {
+    var deleted = trashOldThreadsInGivenThreads_(values, dateTh, field, threads);
+    start = start + MAX_THREADS - deleted;
+    threads = GmailApp.getInboxThreads(start, MAX_THREADS);
+  }
+}
+
+/**
+ * Delete all of the given threads without a label older than the given
+ * date where the given field matches the given values.
+ * @param {string[]} values - values to look for in threads
+ * @param {date} dateTh - date threshold, only threads older than this
+ *                        may be deleted
+ * @param {string} field - where to look for the values, SUBJECT or FROM
+ * @param {GmailThread[]} threads - to look for the values
+ * @return {number} number of deleted threads
+ */
+function trashOldThreadsInGivenThreads_(values, dateTh, field, threads) {
+  deletedDescriptions = "";
+  deletedCount = "";
+  for (var i = 0; i < threads.length; i++) {
+    thread = threads[i];
+//    Logger.log(thread.getMessages()[0].getFrom())
+//    Logger.log(value)
+//    Logger.log(thread.getMessages()[0].getFrom() == value)
+//    Logger.log(thread.getLabels().length)
+    // if it has a label it's somehow important - don't delete
+    if (thread.getLastMessageDate() < dateTh
+            && thread.getLabels().length == 0 // comment out this line to delete threads with labels as well
+            && (field == SUBJECT && stringStartsWithItemInArray_(thread.getFirstMessageSubject(), values)
+                || field == FROM && stringEqualsItemInArray_(thread.getMessages()[0].getFrom(), values))) {
+      thread.moveToTrash();
+      deletedDescriptions = deletedDescriptions + getThreadDescription_(thread);
+      deletedCount++;
+    }
+  }
+  
+  // send an email to yourself with the description of all deleted emails
+  if (deletedDescriptions.length > 0) {
+    GmailApp.sendEmail(MY_EMAIL, deletedCount + " emails deleted", deletedDescriptions);
+  }
+  
+  return deletedCount;
+}
+
+/**
+ * Get a description of a thread, to append to an email with info about
+ * the deleted threads.
+ * @param {GmailThread} thread - to get the description of
+ * @returns {string} description of the thread, including the subject of
+ *                   its first message and the date of its last message
+ */
+function getThreadDescription_(thread) {
+  return "Email with subject " + thread.getFirstMessageSubject()
+         + " and date " + thread.getLastMessageDate() + "\n";
+}
+
+/**
+ * Check whether a string starts with an item in an array.
+ * @param {string} string - to check if it starts with a value
+ * @param {string[]} array - list of values to check in the string
+ * @returns {boolean} true if string starts with an item in array,
+ *                    false otherwise
+ */
+function stringStartsWithItemInArray_(string, array) {
+  for (var i = 0; i < array.length; i++) {
+    if (string.indexOf(array[i]) != -1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Check whether a string equals an item in an array.
+ * @param {string} string - to check if it is a value
+ * @param {string[]} array - list of values to check in the string
+ * @returns {boolean} true if string equals an item in array,
+ *                    false otherwise
+ */
+function stringEqualsItemInArray_(string, array) {
+  for (var i = 0; i < array.length; i++) {
+    if (string == array[i]) {
+      return true;
+    }
+  }
+  return false;
+}
+
