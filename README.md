@@ -15,6 +15,8 @@ You have to write the subjects and senders you want to delete. The search matche
 
 You'll receive emails telling you what's been deleted.
 
+This script can also send you emails telling you which of the senders in your lists aren't sending emails any more and which senders are sending you too many emails, so that you can update your lists accordingly (or unsubscribe).
+
 ## How to use this script
 - Copy the script
 - Sign in to your Google account and go to https://script.google.com

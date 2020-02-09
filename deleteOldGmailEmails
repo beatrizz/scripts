@@ -14,6 +14,11 @@
  * (useful for e.g. newsletters where the date varies) and senders that
  * are equal to the given senders.
  * You'll receive emails telling you what's been deleted.
+ *
+ * This script can also send you emails telling you which of the senders
+ * in your lists aren't sending emails any more and which senders are
+ * sending you too many emails, so that you can update your lists
+ * accordingly (or unsubscribe).
  * 
  * HOW TO USE THIS SCRIPT
  * - Copy the script
@@ -45,6 +50,9 @@
 MY_EMAIL = Session.getActiveUser().getEmail();
 SUBJECT = "subject"
 FROM = "from"
+TOO_MUCH_EMAIL = "[Clean-up script] You're receiving too much email from these people"
+NOT_ENOUGH_EMAIL = "[Clean-up script] You're not receiving email from these people any more"
+EMAIL_COUNT = "[Clean-up script] How many emails you've received"
 
 // dates
 A_MONTH_AGO = new Date();
@@ -57,13 +65,20 @@ A_WEEK_AGO.setDate(A_WEEK_AGO.getDate() - 7);
 // GmailApp.getInboxThreads(start, max) with a max of MAX_THREADS.
 MAX_THREADS = 500
 
-// arrays of subjects to search for
+// if there are more than this number of emails from a sender, the sender
+// will be reported as being noisy
+MAX_EMAILS = 10
+
+// dict to store where you're getting email from
+var counts = {};
+
+// arrays of subjects to search for (note that the subjects this script uses are included)
 SUBJECT_1 = "Newsletter 1"
 SUBJECT_2 = "Newsletter 2"
 WEEK_SUBJECT = [SUBJECT_1, SUBJECT_2]
 SUBJECT_3 = "Newsletter 3"
 SUBJECT_4 = "Newsletter 4"
-MONTH_SUBJECT = [SUBJECT_3, SUBJECT_4]
+MONTH_SUBJECT = [TOO_MUCH_EMAIL, NOT_ENOUGH_EMAIL, EMAIL_COUNT, SUBJECT_3, SUBJECT_4]
 
 // arrays of senders to search for
 FROM_1 = "Blah <blah1@blah.com>"
@@ -208,3 +223,76 @@ function stringEqualsItemInArray_(string, array) {
   return false;
 }
 
+/**
+ * Send emails reporting if senders in the MONTH_FROM list aren't sending
+ * emails any more or if senders not in the MONTH_FROM list are sending
+ * too many emails, so that you can update the list accordingly.
+ *
+ * You can easily modify this function to use any other list.
+ *
+ * You can easily modify trashOldThreadsInGivenThreads() to do this as well.
+ * For now, I have kept the functions separate to keep the code simple while
+ * allowing you to only do what you need. Keeping both things separate does
+ * mean that you iterate through all your emails again every time you run a
+ * different function. Feel free to adapt to your needs.
+ */
+function reportListUpdates() {
+  var start = 0;
+  var threads = GmailApp.getInboxThreads(start, MAX_THREADS);
+  while (threads.length > 0) {
+    updateCounts(threads);
+    start = start + MAX_THREADS;
+    threads = GmailApp.getInboxThreads(start, MAX_THREADS);
+  }
+
+  // send email telling you how many emails each sender has sent you
+  // (this is initially commented out because I don't find it very useful)
+//  var countStr = "";
+//  for (var key in counts) {
+//    countStr = countStr + key + ": " + counts[key] + "\n";
+//  }
+//  GmailApp.sendEmail(MY_EMAIL, EMAIL_COUNT, countStr);
+
+  // send email telling you who isn't sending emails any more, so that you
+  // you can remove them from the list of senders to clean up
+  var cleanup = "";
+  var monthFromLength = MONTH_FROM.length;
+  for (var i = 0; i < monthFromLength; i++) {
+    var sender = MONTH_FROM[i];
+    if (!(sender in counts)) {
+      cleanup = cleanup + sender + "\n";
+    }
+  }
+  if (cleanup.length > 0) {
+    GmailApp.sendEmail(MY_EMAIL, NOT_ENOUGH_EMAIL, cleanup);
+  }
+
+  // send email telling you who is sending too many emails, so that you
+  // you can add them to the list of senders to clean up or unsubscribe
+  var additions = "";
+  for (var sender in counts) {
+    if (!(sender in MONTH_FROM) && counts[sender] > MAX_EMAILS) {
+      additions = additions + sender + " (" + counts[sender] + ")" + "\n";
+    }
+  }
+  if (additions.length > 0) {
+    GmailApp.sendEmail(MY_EMAIL, TOO_MUCH_EMAIL, additions);
+  }
+}
+
+/**
+ * Get the sender of the first email of each thread and add one to the
+ * count of how many emails that sender has sent you.
+ * @param {GmailThread[]} threads - to look for the values
+ */
+function updateCounts(threads) {
+  for (var i = 0; i < threads.length; i++) {
+    thread = threads[i];
+    var from = thread.getMessages()[0].getFrom();
+    if (from in counts) {
+          counts[from] = counts[from] + 1;
+    } else {
+          counts[from] = 1;
+    }
+  }
+}
