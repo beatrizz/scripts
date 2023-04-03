@@ -50,9 +50,11 @@
 MY_EMAIL = Session.getActiveUser().getEmail();
 SUBJECT = "subject"
 FROM = "from"
-TOO_MUCH_EMAIL = "[Clean-up script] You're receiving too much email from these people"
-NOT_ENOUGH_EMAIL = "[Clean-up script] You're not receiving email from these people any more"
-EMAIL_COUNT = "[Clean-up script] How many emails you've received"
+CLEANUP_SUBJECT = "[Clean-up script] "
+TOO_MUCH_EMAIL = CLEANUP_SUBJECT + "You're receiving too much email from these people"
+NOT_ENOUGH_EMAIL = CLEANUP_SUBJECT + "You're not receiving email from these people any more"
+EMAIL_COUNT = CLEANUP_SUBJECT + "How many emails you've received"
+EMAILS_DELETED = " emails deleted"
 
 // dates
 A_MONTH_AGO = new Date();
@@ -78,7 +80,7 @@ SUBJECT_2 = "Newsletter 2"
 WEEK_SUBJECT = [SUBJECT_1, SUBJECT_2]
 SUBJECT_3 = "Newsletter 3"
 SUBJECT_4 = "Newsletter 4"
-MONTH_SUBJECT = [TOO_MUCH_EMAIL, NOT_ENOUGH_EMAIL, EMAIL_COUNT, SUBJECT_3, SUBJECT_4]
+MONTH_SUBJECT = [CLEANUP_SUBJECT, SUBJECT_3, SUBJECT_4]
 
 // arrays of senders to search for
 FROM_1 = "Blah <blah1@blah.com>"
@@ -173,7 +175,7 @@ function trashOldThreadsInGivenThreads_(values, dateTh, field, threads) {
   
   // send an email to yourself with the description of all deleted emails
   if (deletedDescriptions.length > 0) {
-    GmailApp.sendEmail(MY_EMAIL, deletedCount + " emails deleted", deletedDescriptions);
+    GmailApp.sendEmail(MY_EMAIL, CLEANUP_SUBJECT + deletedCount + EMAILS_DELETED, deletedDescriptions);
   }
   
   return deletedCount;
