@@ -163,7 +163,7 @@ function trashOldThreadsInGivenThreads_(values, dateTh, field, threads) {
     // if it has a label it's somehow important - don't delete
     if (thread.getLastMessageDate() < dateTh
             && thread.getLabels().length == 0 // comment out this line to delete threads with labels as well
-            && (field == SUBJECT && stringStartsWithItemInArray_(thread.getFirstMessageSubject(), values)
+            && (field == SUBJECT && stringContainsItemInArray_(thread.getFirstMessageSubject(), values)
                 || field == FROM && stringEqualsItemInArray_(thread.getMessages()[0].getFrom(), values))) {
       thread.moveToTrash();
       deletedDescriptions = deletedDescriptions + getThreadDescription_(thread);
@@ -192,13 +192,13 @@ function getThreadDescription_(thread) {
 }
 
 /**
- * Check whether a string starts with an item in an array.
- * @param {string} string - to check if it starts with a value
+ * Check whether a string contains an item in an array.
+ * @param {string} string - to check if it contains a value
  * @param {string[]} array - list of values to check in the string
- * @returns {boolean} true if string starts with an item in array,
+ * @returns {boolean} true if string contains an item in array,
  *                    false otherwise
  */
-function stringStartsWithItemInArray_(string, array) {
+function stringContainsItemInArray_(string, array) {
   for (var i = 0; i < array.length; i++) {
     if (string.indexOf(array[i]) != -1) {
       return true;
